@@ -1,3 +1,6 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;           Eval and Apply              ;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (eval exp env)
    (cond ((self-evaluating? exp)
            exp)
@@ -53,7 +56,9 @@
                    procedure))))
 
 
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;        Procedure arguments            ;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (list-of-values exps env)
    (if (no-operands? exps)
        '()
@@ -63,13 +68,18 @@
                env))))
 
 
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;              Conditions               ;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (eval-if exp env)
    (if (true? (eval (if-predicate exp) env))
        (eval (if-consequent exp) env)
        (eval (if-alternative exp) env)))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                 Sequence              ;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (eval-sequence exps env)
    (cond ((last-exp? exps)
          (eval (first-exp exps) env))
@@ -79,6 +89,9 @@
                           env))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;      Assignments and definitions       ;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (eval-assignment exp env)
    (define-variable!
       (definition-variable exp)
@@ -86,10 +99,21 @@
       env)
       'ok)
 
+(define (eval-definition exp env)
+   (define-variable!
+      (definition-variable exp)
+      (eval (definition-value  exp) env)
+      env)
+ 'ok)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;        Representing Expressions       ;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define (self-evaluating? exp)
    (cond ((number? exp)  true)
          ((string? exp)  true)
-         (else #f)))
+         (else  false)))
 
 
 (define (variable? exp) (symbol? exp))
@@ -106,7 +130,7 @@
  (define (tagged-list? exp tag)
     (if (pair? exp)
         (eq? (car exp)  tag)
-         #f))
+        false))
 
 
 (define (assignment? exp)
@@ -148,7 +172,7 @@
 (define (if-alternative exp)
    (if (not (null? (cdddr exp)))
        (cadddr exp)
-        #f))
+        'false))
 (define (make-if predicate
                  consequent 
                  alternative)
@@ -171,6 +195,7 @@
 (define (make-begin seq) (cons 'begin seq))
 
 
+
 (define (application? exp) (pair? exp))
 (define (operator exp) (car exp))
 (define (operands exp)(cdr exp))
@@ -179,18 +204,34 @@
 (define (rest-operands ops) (cdr ops))
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;           Derived expression          ;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (cond? exp)
    (tagged-list? exp 'cond))
+
+
 (define (cond-clauses exp)  (cdr exp))
+
+
 (define (cond-else-clause? clause)
    (eq? (cond-predicate clause) 'else))
+
+
 (define (cond-predicate clause) (car clause))
+
+
 (define (cond-actions clause) (cdr clause))
+
+
 (define (cond->if exp)
   (expand-clauses (cond-clauses exp)))
+
+
 (define (expand-caluse clauses)
    (if (null? clauses)
-       #f  ;no else clause
+       'false  ;no else clause
        (let ((first (car clauses))
              (rest  (cdr clauses)))
           (if (cond-else-clause? first)
@@ -205,5 +246,110 @@
                           (cond-actions first))
                        (expand-clauses rest))))))
 
- 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;     Evaluator Data Structures         ;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Testing of predicates
+ (define (true? x) (not (eq? x false)))
+
+
+ (define (fasle? x) (eq? x false))
+
+
+;; Compound procedures
+(define (make-procedure parameters body env)
+   (list 'procedure parameters body env))
+
+
+(define (compound-procedure? p) (tagged-list? p 'procedure))
+
+
+(define (procedure-parameters p) (cadr p))
+
+
+(define (procedure-body p) (caddr p))
+
+
+(define (procedure-environment p) (cadddr p))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;     Operations on Environment         ;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (enclosing-environment env) (cdr env))
+
+
+(define (first-frame env) (car env))
+
+
+(define the-empty-environment '())
+
+
+(define (make-frame variables values)
+   (cons variable values))
+
+
+(define (frame-variables frame) (car frame))
+
+
+(define (frame-values frame)(cdr frame))
+
+
+(define (add-binding-to-frame! var val frame)
+   (set-car! frame (cons var (car frame)))
+   (ser-cdr! frame (cons val (cdr frame))))
+
+
+(define (extend-environment vars vals base-env)
+   (if (= (length vars) (length vals))
+       (cons (make-frame vars vals) base-env)
+       (if (< (length vars) (length vals))
+           (error "Too many arguments supplied" vars vals)
+           (error "Too few arguments supplied" vars vals))))
+
+
+(define (lookup-variable-value var env)
+   (define (env-loop env)
+      (define (scan vars  vals)
+         (cond ((null? vars)
+               (env-loop
+                  (enclosing-environment env)))
+               ((eq? var (car vars)) (car vals))
+               (else (scan (cdr vars) (cdr vals)))))
+      (if (eq? env the-empty-environment)
+          (error "Unbound variable" var)
+          (let ((frame (first-frame env)))
+               (scan (frame-variables frame)
+                     (frame-values frame)))))
+    (env-loop  env))
+
+
+(define (set-variable-value! val val env)
+   (define (env-loop env)
+      (define (scan vars vals)
+         (cond ((null? vars)
+                (env-loop
+                   (enclosing-environment env)))
+               ((eq? var (car vars)) (set-car! vals var))
+               (else (scan (cdr vars) (cdr vals)))))
+  (if (eq? env the-empty-environment)
+      (error "Unbound variable: SET!" var)
+      (let ((frame (first-frame env)))
+         (scan (frame-variables  frame)
+               (frame-values frame)))))
+ (env-loop env))
+
+
+(define (define-variable! var val env)
+   (let ((frame (first-frame env)))
+      (define (scan vars vals)
+         (cond ((null? vars)
+               (add-binding-to-frame! var val frame))
+               ((eq? var (car vars)) (set-car!vals val))
+               (else (scan (cdr vars) (cdr vals)))))
+      (scan (frame-variables frame) (frame-values frame))))
+
 
