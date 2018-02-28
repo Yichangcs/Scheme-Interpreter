@@ -89,7 +89,7 @@
 (define (self-evaluating? exp)
    (cond ((number? exp)  true)
          ((string? exp)  true)
-         (else false)))
+         (else #f)))
 
 
 (define (variable? exp) (symbol? exp))
@@ -106,7 +106,7 @@
  (define (tagged-list? exp tag)
     (if (pair? exp)
         (eq? (car exp)  tag)
-         false))
+         #f))
 
 
 (define (assignment? exp)
@@ -148,7 +148,7 @@
 (define (if-alternative exp)
    (if (not (null? (cdddr exp)))
        (cadddr exp)
-        'false))
+        #f))
 (define (make-if predicate
                  consequent 
                  alternative)
@@ -190,7 +190,7 @@
   (expand-clauses (cond-clauses exp)))
 (define (expand-caluse clauses)
    (if (null? clauses)
-       'false  ;no else clause
+       #f  ;no else clause
        (let ((first (car clauses))
              (rest  (cdr clauses)))
           (if (cond-else-clause? first)
