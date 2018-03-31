@@ -54,7 +54,11 @@
            (error "Unknown procedure
                    type: APPLY"
                    procedure))))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;        logical constants              ;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define true #t)
+(define false #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;        Procedure arguments            ;;;;;;;
@@ -94,8 +98,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (eval-assignment exp env)
    (set-variable-value!
-      (definition-variable exp)
-      (eval (definition-value exp) env)
+      (assignment-variable exp)
+      (eval (assignment-value exp) env)
       env)
       'ok)
 
@@ -147,15 +151,15 @@
 (define (definition? exp)
    (tagged-list? exp 'define))
 (define (definition-variable exp)
-   (if (symbol? (cadr exp))
+   (if (symbol? (cadr exp))    ;; (define <var> <value>)
        (cadr exp)
-       (caadr exp)))
+       (caadr exp)))           ;; another form: (define (<var> <param1> ... <parami>) <body>)
 (define (definition-value exp)
    (if (symbol? (cadr exp))
        (caddr exp)
-        (make-lambda
-          (cdadr exp)   ;formal parameters
-          (cddr exp)))) ;body    
+        (make-lambda           ;; another form above
+          (cdadr exp)   ;; <formal parameters>
+          (cddr exp)))) ;； <body>    
 
 
 (define (lambda? exp)
@@ -190,15 +194,15 @@
 (define (rest-exps seq) (cdr seq))
 (define (sequence->exp seq)
    (cond ((null? seq) seq)
-         ((last-exp? seq) (first-exp seq))
-         (else (make-begin seq))))
+         ((last-exp? seq) (first-exp seq))   ;; just one expression
+         (else (make-begin seq))))           ;; more than one expression
 (define (make-begin seq) (cons 'begin seq))
 
 
 
-(define (application? exp) (pair? exp))
+(define (application? exp) (pair? exp))   ;; compound expression not one of the above types
 (define (operator exp) (car exp))
-(define (operands exp)(cdr exp))
+(define (operands exp)(cdr exp))          ;; a list of operands
 (define (no-operands? ops) (null? ops))
 (define (first-operand ops) (car ops))
 (define (rest-operands ops) (cdr ops))
