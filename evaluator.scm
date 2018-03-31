@@ -327,7 +327,7 @@
     (env-loop  env))
 
 
-(define (set-variable-value! val val env)
+(define (set-variable-value! var val env)
    (define (env-loop env)
       (define (scan vars vals)
          (cond ((null? vars)
