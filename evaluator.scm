@@ -349,8 +349,8 @@
 (define (setup-environment)
    (let ((initial-env
            (extend-environment
-              (primitive-procedure-names)
-              (primitive-procedure-objects)
+              (primitive-procedure-names)    ;; carry out a procedure
+              (primitive-procedure-objects)  ;; carry out a procedure  
               the-empty-environment)))
       (define-variable! 'true true initial-env)
       (define-variable! 'false false initial-env)
@@ -358,9 +358,9 @@
 
 (define the-global-environment (setup-environment))
 
-(define (primitive-procedure? proc)
-   (tagged-list? proc 'primitive))
-
+(define (primitive-procedure? proc)   ;; a primitive procedures is represented as 
+   (tagged-list? proc 'primitive))    ;; a list beginning with "primitive" and containing a procedure
+                                      ;; in the underlying Lisp that implements that primitive
 (define (primitive-implementation proc)
    (cadr proc))
 
@@ -375,10 +375,10 @@
 (define (primitive-procedure-names)
    (map car primitive-procedures))
 
-(define (primitive-procedure-objects)
+(define (primitive-procedure-objects)   
    (map (lambda (proc)
-           (list 'primitive  (cadr proc)))
-         primitive-procedure-names))
+           (list 'primitive  (cadr proc)))   ;; which results in ('primitive car) 
+         primitive-procedures))
 
 (define apply-in-underlying-schme apply)
 
