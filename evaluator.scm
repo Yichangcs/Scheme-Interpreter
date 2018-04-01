@@ -219,11 +219,11 @@
 (define (cond-clauses exp)  (cdr exp))
 
 
-(define (cond-else-clause? clause)
-   (eq? (cond-predicate clause) 'else))
+(define (cond-else-clause? clause)                    ;; (cond ((> x 0) x)
+   (eq? (cond-predicate clause) 'else))               ;;       ((= x 0) (display 'zero) 0)
+                                                      ;;       (else (- x)))
 
-
-(define (cond-predicate clause) (car clause))
+(define (cond-predicate clause) (car clause))  
 
 
 (define (cond-actions clause) (cdr clause))
@@ -257,24 +257,18 @@
 
 ;; Testing of predicates
  (define (true? x) (not (eq? x false)))
-
-
  (define (fasle? x) (eq? x false))
 
 
 ;; Compound procedures
-(define (make-procedure parameters body env)
+(define (make-procedure parameters body env)     ;; used in eval when processing lambda expression
    (list 'procedure parameters body env))
 
-
-(define (compound-procedure? p) (tagged-list? p 'procedure))
-
+(define (compound-procedure? p) (tagged-list? p 'procedure))  
 
 (define (procedure-parameters p) (cadr p))
 
-
 (define (procedure-body p) (caddr p))
-
 
 (define (procedure-environment p) (cadddr p))
 
@@ -283,40 +277,35 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;     Operations on Environment         ;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define (enclosing-environment env) (cdr env))
+;; an environment is a sequence of frames, where each frame is a
+;; table of bindings that associate variables with their corresponding values.
 
+(define (enclosing-environment env) (cdr env))
 
 (define (first-frame env) (car env))
 
-
 (define the-empty-environment '())
-
 
 (define (make-frame variables values)
    (cons variable values))
 
-
 (define (frame-variables frame) (car frame))
 
-
 (define (frame-values frame)(cdr frame))
-
 
 (define (add-binding-to-frame! var val frame)
    (set-car! frame (cons var (car frame)))
    (ser-cdr! frame (cons val (cdr frame))))
 
-
-(define (extend-environment vars vals base-env)
-   (if (= (length vars) (length vals))
-       (cons (make-frame vars vals) base-env)
+(define (extend-environment vars vals base-env)  ;; return a new environment, consisting of 
+   (if (= (length vars) (length vals))           ;; a new frame in which the symbols in the list
+       (cons (make-frame vars vals) base-env)    ;; <vars> are bound to the corresponding <values>
        (if (< (length vars) (length vals))
            (error "Too many arguments supplied" vars vals)
            (error "Too few arguments supplied" vars vals))))
 
-
-(define (lookup-variable-value var env)
-   (define (env-loop env)
+(define (lookup-variable-value var env)    ;; return the value that is bound to 
+   (define (env-loop env)                  ;; the symbol <var> in the environment <env>
       (define (scan vars  vals)
          (cond ((null? vars)
                (env-loop
@@ -330,9 +319,8 @@
                      (frame-values frame)))))
     (env-loop  env))
 
-
-(define (set-variable-value! var val env)
-   (define (env-loop env)
+(define (set-variable-value! var val env)   ;; changes the binding of the <var> in the <env> so that
+   (define (env-loop env)                   ;; the variable is now bound to the <value>
       (define (scan vars vals)
          (cond ((null? vars)
                 (env-loop
@@ -346,9 +334,8 @@
                (frame-values frame)))))
  (env-loop env))
 
-
-(define (define-variable! var val env)
-   (let ((frame (first-frame env)))
+(define (define-variable! var val env)   ;; adds to the first frame in the environment <env> a new
+   (let ((frame (first-frame env)))      ;; binding that associates the variable <var> with the <value>
       (define (scan vars vals)
          (cond ((null? vars)
                (add-binding-to-frame! var val frame))
