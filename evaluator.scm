@@ -45,11 +45,9 @@
             (eval-sequence
                (procedure-body  procedure)
                (extend-environment
-                  (procedure-parameters
-                   procedure)
-                  arguments
-                  (procedure-environment
-                   procedure))))
+                  (procedure-parameters procedure)
+                   arguments
+                  (procedure-environment procedure))))
          (else
            (error "Unknown procedure
                    type: APPLY"
@@ -287,7 +285,7 @@
 (define the-empty-environment '())
 
 (define (make-frame variables values)
-   (cons variable values))
+   (cons variables values))
 
 (define (frame-variables frame) (car frame))
 
@@ -295,7 +293,7 @@
 
 (define (add-binding-to-frame! var val frame)
    (set-car! frame (cons var (car frame)))
-   (ser-cdr! frame (cons val (cdr frame))))
+   (set-cdr! frame (cons val (cdr frame))))
 
 (define (extend-environment vars vals base-env)  ;; return a new environment, consisting of 
    (if (= (length vars) (length vals))           ;; a new frame in which the symbols in the list
@@ -339,13 +337,29 @@
       (define (scan vars vals)
          (cond ((null? vars)
                (add-binding-to-frame! var val frame))
-               ((eq? var (car vars)) (set-car!vals val))
+               ((eq? var (car vars)) (set-car! vals val))
                (else (scan (cdr vars) (cdr vals)))))
       (scan (frame-variables frame) (frame-values frame))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;    Running the Evaluator as a Program    ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define primitive-procedures 
+   (list (list 'car car)
+         (list 'cdr cdr)
+         (list 'cons cons)
+         (list 'null? null?)
+         ;; more primitives
+         ))
+
+(define (primitive-procedure-objects)   
+   (map (lambda (proc)
+           (list 'primitive  (cadr proc)))   ;; which results in ('primitive car) 
+         primitive-procedures))
+
+(define (primitive-procedure-names)
+   (map car primitive-procedures))
+
 (define (setup-environment)
    (let ((initial-env
            (extend-environment
@@ -364,22 +378,6 @@
 (define (primitive-implementation proc)
    (cadr proc))
 
-(define primitive-procedures 
-   (list (list 'car car)
-         (list 'cdr cdr)
-         (list 'cons cons)
-         (list 'null? null?)
-         ;; more primitives
-         ))
-
-(define (primitive-procedure-names)
-   (map car primitive-procedures))
-
-(define (primitive-procedure-objects)   
-   (map (lambda (proc)
-           (list 'primitive  (cadr proc)))   ;; which results in ('primitive car) 
-         primitive-procedures))
-
 (define apply-in-underlying-schme apply)
 
 (define (apply-primitive-procedure proc args)
@@ -393,7 +391,7 @@
 (define output-prompt ";;; M-Eval value:")
 
 (define (driver-loop)
-  (prompt-for-input input-promp)
+  (prompt-for-input input-prompt)
   (let ((input (read)))
      (let ((output
              (eval input the-global-environment)))
