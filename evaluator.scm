@@ -349,8 +349,8 @@
 (define (setup-environment)
    (let ((initial-env
            (extend-environment
-              (primitive-procedure-names)    ;; carry out a procedure
-              (primitive-procedure-objects)  ;; carry out a procedure  
+              (primitive-procedure-names)    ;; carry out a procedure to produce names
+              (primitive-procedure-objects)  ;; carry out a procedure to produce objects
               the-empty-environment)))
       (define-variable! 'true true initial-env)
       (define-variable! 'false false initial-env)
@@ -385,3 +385,38 @@
 (define (apply-primitive-procedure proc args)
    (apply-in-underlying-schme
      (primitive-implementation proc) args))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;           Read-eval-print-loop           ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define input-prompt ";;; M-Eval input:")
+(define output-prompt ";;; M-Eval value:")
+
+(define (driver-loop)
+  (prompt-for-input input-promp)
+  (let ((input (read)))
+     (let ((output
+             (eval input the-global-environment)))
+        (announce-output output-prompt)
+        (user-print output)))
+  (driver-loop))
+
+(define (prompt-for-input string)
+   (newline) (newline)
+   (display string) (newline))
+
+(define (announce-output string)
+   (newline) (display string) (newline))
+
+(define (user-print object)
+   (if (compound-procedure? object)
+       (display
+         (list 'compound-procedure
+                (procedure-parameters object)
+                (procedure-body object)
+                '<procedure-env>))
+      (display object)))
+
+
+
+
