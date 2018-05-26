@@ -1,5 +1,5 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;           Eval and Apply              ;;;;;;;
+;;;;           Eval and meta-apply              ;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (eval exp env)
    (cond ((self-evaluating? exp)
@@ -26,7 +26,7 @@
          ((cond? exp)
            (eval (cond->if exp) env))
          ((application? exp) 
-           (apply (eval (operator exp) env)
+           (meta-apply (eval (operator exp) env)
                   (list-of-values
                     (operands exp)
                     env)))
@@ -35,10 +35,9 @@
                       type: EVAL" exp))))
 
 
-
-(define (apply procedure arguments)
+(define (meta-apply procedure arguments)
    (cond ((primitive-procedure? procedure)
-         (apply-primitive-procedure
+         (meta-apply-primitive-procedure
             procedure
             arguments))
          ((compound-procedure? procedure)
@@ -50,7 +49,7 @@
                   (procedure-environment procedure))))
          (else
            (error "Unknown procedure
-                   type: APPLY"
+                   type: meta-apply"
                    procedure))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;        logical constants              ;;;;;;;
@@ -349,6 +348,10 @@
          (list 'cdr cdr)
          (list 'cons cons)
          (list 'null? null?)
+         (list '+  +)
+         (list '-  -)
+         (list '*  *)
+         (list '/  /)
          ;; more primitives
          ))
 
@@ -378,10 +381,10 @@
 (define (primitive-implementation proc)
    (cadr proc))
 
-(define apply-in-underlying-schme apply)
+(define meta-apply-in-underlying-schme apply)
 
-(define (apply-primitive-procedure proc args)
-   (apply-in-underlying-schme
+(define (meta-apply-primitive-procedure proc args)
+   (meta-apply-in-underlying-schme
      (primitive-implementation proc) args))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
