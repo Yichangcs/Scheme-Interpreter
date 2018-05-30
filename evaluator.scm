@@ -1,56 +1,87 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;           Eval and meta-apply              ;;;;;;;
+;;;;           Eval and Analyze               ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define (eval exp env)
+(define (eval exp env) ((analyze exp) env))
+
+(define (analyze exp)
    (cond ((self-evaluating? exp)
-           exp)
+           (analyze-self-evaluating exp))
          ((variable? exp)
-          (lookup-variable-value exp env))
+          (analyze-variable exp))
          ((quoted? exp)
-          (text-of-quotation exp))
+          (analyze-quoted exp))
          ((assignment? exp)
-          (eval-assignment exp env))
+          (analyze-assignment exp))
          ((definition? exp)
-          (eval-definition exp env))
+          (analyze-definition exp))
          ((if? exp)
-          (eval-if exp env))
+          (analyze-if exp))
          ((lambda? exp) 
-          (make-procedure
-            (lambda-parameters exp)
-            (lambda-body exp)
-            env))
+           (analyze-lambda exp))
          ((begin? exp)
-          (eval-sequence
-            (begin-actions exp)
-            env))
+          (analyze-sequence
+            (begin-actions exp)))
          ((cond? exp)
-           (eval (cond->if exp) env))
+           (analyze (cond->if exp) env))
          ((application? exp) 
-           (meta-apply (eval (operator exp) env)
-                  (list-of-values
-                    (operands exp)
-                    env)))
+           (analyze-application exp))
            (else
               (error "Unknown expression
                       type: EVAL" exp))))
 
+(define (analyze-self-evaluating exp)
+  (lambda (env) exp))
 
-(define (meta-apply procedure arguments)
-   (cond ((primitive-procedure? procedure)
-         (meta-apply-primitive-procedure
-            procedure
-            arguments))
-         ((compound-procedure? procedure)
-            (eval-sequence
-               (procedure-body  procedure)
-               (extend-environment
-                  (procedure-parameters procedure)
-                   arguments
-                  (procedure-environment procedure))))
-         (else
-           (error "Unknown procedure
-                   type: meta-apply"
-                   procedure))))
+(define (analyze-quoted exp)
+  (let ((qval (text-of-quotation exp)))
+    (lambda (env) qval)))
+
+(define (analyze-variable exp)
+  (lambda (env) 
+    (lookup-variable-value exp env)))
+
+(define (analyze-application exp)
+  (let ((fproc (analyze (operator exp)))
+        (aprocs (map analyze (operands exp))))
+    (lambda (env)
+      (execute-application 
+       (fproc env)
+       (map (lambda (aproc) (aproc env))
+            aprocs)))))
+
+
+
+
+(define (analyze-lambda exp)
+  (let ((vars (lambda-parameters exp))
+        (bproc (analyze-sequence 
+                (lambda-body exp))))
+    (lambda (env) 
+      (make-procedure vars bproc env))))
+
+
+
+(define (analyze-application exp)
+  (let ((fproc (analyze (operator exp)))
+        (aprocs (map analyze (operands exp))))
+    (lambda (env)
+      (execute-application 
+       (fproc env)
+       (map (lambda (aproc) (aproc env))
+            aprocs)))))
+
+(define (execute-application proc args)
+  (cond ((primitive-procedure? proc)
+         (apply-primitive-procedure proc args))
+        ((compound-procedure? proc)
+         ((procedure-body proc)
+          (extend-environment 
+           (procedure-parameters proc)
+           args
+           (procedure-environment proc))))
+        (else (error "Unknown procedure type: 
+                      EXECUTE-APPLICATION"
+                     proc))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;        logical constants              ;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -58,54 +89,56 @@
 (define false #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;        Procedure arguments            ;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define (list-of-values exps env)
-   (if (no-operands? exps)
-       '()
-       (cons (eval (first-operand exps) env)
-             (list-of-values 
-               (rest-operands exps)
-               env))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;              Conditions               ;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define (eval-if exp env)
-   (if (true? (eval (if-predicate exp) env))
-       (eval (if-consequent exp) env)
-       (eval (if-alternative exp) env)))
+(define (analyze-if exp)
+  (let ((pproc (analyze (if-predicate exp)))
+        (cproc (analyze (if-consequent exp)))
+        (aproc (analyze (if-alternative exp))))
+    (lambda (env)
+      (if (true? (pproc env))
+          (cproc env)
+          (aproc env)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;                 Sequence              ;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define (eval-sequence exps env)
-   (cond ((last-exp? exps)
-         (eval (first-exp exps) env))
-         (else 
-           (eval (first-exp exps) env)
-           (eval-sequence (rest-exps exps)
-                          env))))
+(define (analyze-sequence exps)
+  (define (sequentially proc1 proc2)
+    (lambda (env) (proc1 env) (proc2 env)))
+  (define (loop first-proc rest-procs)
+    (if (null? rest-procs)
+        first-proc
+        (loop (sequentially first-proc 
+                            (car rest-procs))
+              (cdr rest-procs))))
+  (let ((procs (map analyze exps)))
+    (if (null? procs)
+        (error "Empty sequence: ANALYZE"))
+    (loop (car procs) (cdr procs))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;      Assignments and definitions       ;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define (eval-assignment exp env)
-   (set-variable-value!
-      (assignment-variable exp)
-      (eval (assignment-value exp) env)
-      env)
-      'ok)
+(define (analyze-assignment exp)
+  (let ((var (assignment-variable exp))
+        (vproc (analyze 
+                (assignment-value exp))))
+    (lambda (env)
+      (set-variable-value! 
+       var (vproc env) env)
+      'ok)))
 
-(define (eval-definition exp env)
-   (define-variable!
-      (definition-variable exp)
-      (eval (definition-value  exp) env)
-      env)
- 'ok)
+
+(define (analyze-definition exp)
+  (let ((var (definition-variable exp))
+        (vproc (analyze 
+                (definition-value exp))))
+    (lambda (env)
+      (define-variable! var (vproc env) env)
+      'ok)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;        Representing Expressions       ;;;;;;;
@@ -116,34 +149,26 @@
          ((string? exp)  true)
          (else  false)))
 
-
 (define (variable? exp) (symbol? exp))
-
 
 (define (quoted? exp)
    (tagged-list? exp 'quote))
 
-
  (define (text-of-quotation exp)
     (cadr exp))
-
 
  (define (tagged-list? exp tag)
     (if (pair? exp)
         (eq? (car exp)  tag)
         false))
 
-
 (define (assignment? exp)
    (tagged-list? exp 'set!))
-
 
 (define (assignment-variable exp)
    (cadr exp))
 
-
 (define (assignment-value exp) (caddr exp))
-
 
 (define (definition? exp)
    (tagged-list? exp 'define))
@@ -158,14 +183,12 @@
           (cdadr exp)   ;; <formal parameters>
           (cddr exp)))) ;； <body>    
 
-
 (define (lambda? exp)
    (tagged-list? exp 'lambda))
 (define (lambda-parameters exp) (cadr exp))
 (define (lambda-body exp) (cddr exp))
 (define (make-lambda parameters body)
    (cons 'lambda (cons parameters body)))
-
 
 (define (if? exp) (tagged-list? exp 'if))
 (define (if-predicate exp) (cadr exp))
@@ -182,7 +205,6 @@
          consequent
          alternative))
 
-
 (define (begin? exp)
    (tagged-list? exp 'begin))
 (define (begin-actions exp)(cdr exp))
@@ -195,8 +217,6 @@
          (else (make-begin seq))))           ;; more than one expression
 (define (make-begin seq) (cons 'begin seq))
 
-
-
 (define (application? exp) (pair? exp))   ;; compound expression not one of the above types
 (define (operator exp) (car exp))
 (define (operands exp)(cdr exp))          ;; a list of operands
@@ -204,31 +224,23 @@
 (define (first-operand ops) (car ops))
 (define (rest-operands ops) (cdr ops))
 
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;           Derived expression          ;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (cond? exp)
    (tagged-list? exp 'cond))
 
-
 (define (cond-clauses exp)  (cdr exp))
-
 
 (define (cond-else-clause? clause)                    ;; (cond ((> x 0) x)
    (eq? (cond-predicate clause) 'else))               ;;       ((= x 0) (display 'zero) 0)
                                                       ;;       (else (- x)))
-
 (define (cond-predicate clause) (car clause))  
-
 
 (define (cond-actions clause) (cdr clause))
 
-
 (define (cond->if exp)
   (expand-clauses (cond-clauses exp)))
-
 
 (define (expand-caluse clauses)
    (if (null? clauses)
@@ -247,15 +259,12 @@
                           (cond-actions first))
                        (expand-clauses rest))))))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;     Evaluator Data Structures         ;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 ;; Testing of predicates
  (define (true? x) (not (eq? x false)))
  (define (fasle? x) (eq? x false))
-
 
 ;; Compound procedures
 (define (make-procedure parameters body env)     ;; used in eval when processing lambda expression
@@ -268,8 +277,6 @@
 (define (procedure-body p) (caddr p))
 
 (define (procedure-environment p) (cadddr p))
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;     Operations on Environment         ;;;;;;;
@@ -417,7 +424,3 @@
                 (procedure-body object)
                 '<procedure-env>))
       (display object)))
-
-
-
-
