@@ -22,7 +22,7 @@
           (analyze-sequence
             (begin-actions exp)))
          ((cond? exp)
-           (analyze (cond->if exp) env))
+           (analyze (cond->if exp)))
          ((application? exp) 
            (analyze-application exp))
            (else
@@ -237,7 +237,7 @@
 (define (cond->if exp)
   (expand-clauses (cond-clauses exp)))
 
-(define (expand-caluse clauses)
+(define (expand-clauses clauses)
    (if (null? clauses)
        'false  ;no else clause
        (let ((first (car clauses))
