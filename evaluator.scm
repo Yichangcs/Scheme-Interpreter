@@ -29,38 +29,9 @@
               (error "Unknown expression
                       type: EVAL" exp))))
 
-(define (analyze-self-evaluating exp)
-  (lambda (env) exp))
-
-(define (analyze-quoted exp)
-  (let ((qval (text-of-quotation exp)))
-    (lambda (env) qval)))
-
-(define (analyze-variable exp)
-  (lambda (env) 
-    (lookup-variable-value exp env)))
-
-(define (analyze-application exp)
-  (let ((fproc (analyze (operator exp)))
-        (aprocs (map analyze (operands exp))))
-    (lambda (env)
-      (execute-application 
-       (fproc env)
-       (map (lambda (aproc) (aproc env))
-            aprocs)))))
-
-
-
-
-(define (analyze-lambda exp)
-  (let ((vars (lambda-parameters exp))
-        (bproc (analyze-sequence 
-                (lambda-body exp))))
-    (lambda (env) 
-      (make-procedure vars bproc env))))
-
-
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                 Application             ;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (analyze-application exp)
   (let ((fproc (analyze (operator exp)))
         (aprocs (map analyze (operands exp))))
@@ -82,11 +53,6 @@
         (else (error "Unknown procedure type: 
                       EXECUTE-APPLICATION"
                      proc))))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;        logical constants              ;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define true #t)
-(define false #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;              Conditions               ;;;;;;;
@@ -100,9 +66,18 @@
           (cproc env)
           (aproc env)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                 lambda                  ;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (analyze-lambda exp)
+  (let ((vars (lambda-parameters exp))
+        (bproc (analyze-sequence 
+                (lambda-body exp))))
+    (lambda (env) 
+      (make-procedure vars bproc env))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;                 Sequence              ;;;;;;;
+;;;;                 Sequence                ;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define (analyze-sequence exps)
   (define (sequentially proc1 proc2)
@@ -112,9 +87,9 @@
         first-proc
         (loop (sequentially first-proc 
                             (car rest-procs))
-              (cdr rest-procs))))
-  (let ((procs (map analyze exps)))
-    (if (null? procs)
+              (cdr rest-procs))))               ;; procs in rest-procs are extracted 
+  (let ((procs (map analyze exps)))             ;; into a nested lambda expression one
+    (if (null? procs)                           ;; by one
         (error "Empty sequence: ANALYZE"))
     (loop (car procs) (cdr procs))))
 
@@ -139,6 +114,20 @@
     (lambda (env)
       (define-variable! var (vproc env) env)
       'ok)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;           analyze other things           ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (analyze-self-evaluating exp)
+  (lambda (env) exp))  ;; ignores its environment argument
+
+(define (analyze-quoted exp)
+  (let ((qval (text-of-quotation exp)))
+    (lambda (env) qval)))
+
+(define (analyze-variable exp)
+  (lambda (env) 
+    (lookup-variable-value exp env)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;        Representing Expressions       ;;;;;;;
@@ -223,6 +212,12 @@
 (define (no-operands? ops) (null? ops))
 (define (first-operand ops) (car ops))
 (define (rest-operands ops) (cdr ops))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;        logical constants              ;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define true #t)
+(define false #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;           Derived expression          ;;;;;;;
@@ -388,7 +383,7 @@
 (define (primitive-implementation proc)
    (cadr proc))
 
-(define meta-apply-in-underlying-schme apply)
+(define meta-apply-in-underlying-schme apply) ;; to apply primitive procedures
 
 (define (meta-apply-primitive-procedure proc args)
    (meta-apply-in-underlying-schme

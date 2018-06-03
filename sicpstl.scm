@@ -494,26 +494,3 @@
                 (+ (* dt (stream-car integrand))
                    initial-value)
                 dt)))))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
