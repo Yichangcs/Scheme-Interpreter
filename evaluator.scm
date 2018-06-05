@@ -43,7 +43,7 @@
 
 (define (execute-application proc args)
   (cond ((primitive-procedure? proc)
-         (apply-primitive-procedure proc args))
+         (meta-apply-primitive-procedure proc args))
         ((compound-procedure? proc)
          ((procedure-body proc)
           (extend-environment 
