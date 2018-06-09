@@ -10,7 +10,7 @@ Having two different things called apply leads to a technical problem in running
 
       (define apply-in-underlying-scheme apply)
 
-## seperating syntatic Analysis from execution
+## separating syntatic Analysis from execution
 The procedure analyze takes only the expression. It performs the syntactic analysis and returns a new procedure, the execution procedure, which is actually nested lambda expressions,that encapsulates the work to be done in executing the analyzed expression. The execution procedure takes an environment as its argument and completes the evaluation. This saves work because analyze will be called only once on an expression, while the execution procedure may be called many times.
 
       (define (eval exp env) ((analyze exp) env))
