@@ -1,5 +1,5 @@
 # Metacircular-Evaluator
-The Scheme interpreter in SICP which is implemented by Scheme
+The Scheme interpreter in SICP[1] which is implemented by Scheme
 
 
 > The evaluator, which determines the meaning of expressions in a programming language, is just another program.
@@ -40,3 +40,4 @@ step3. feed in some expressions
 
       ;;; M-Eval value:
       (a b c d e f)
+[1] SICP-> http://sarabander.github.io/sicp/html/index.xhtml#SEC_Contents
